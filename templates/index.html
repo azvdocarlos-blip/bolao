@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Jogos Disponíveis</h2>
+    <span class="badge bg-primary">Usuário: {{ current_user.username }}</span>
+</div>
+
+<div class="row">
+    {% if not games %}
+        <div class="col-12 text-center mt-5">
+            <div class="alert alert-info">
+                Nenhum jogo cadastrado para esta rodada ainda. 
+                <br>Aguarde o administrador inserir as partidas!
+            </div>
+        </div>
+    {% else %}
+        {% for game in games %}
+        <div class="col-md-6 mb-3">
+            <div class="card shadow-sm">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Rodada {{ game.round_no }}</h5>
+                    <div class="d-flex justify-content-around align-items-center">
+                        <span class="fw-bold">{{ game.team_a }}</span>
+                        <input type="number" class="form-control text-center" style="width: 60px;" placeholder="0">
+                        <span>X</span>
+                        <input type="number" class="form-control text-center" style="width: 60px;" placeholder="0">
+                        <span class="fw-bold">{{ game.team_b }}</span>
+                    </div>
+                    <button class="btn btn-outline-success btn-sm mt-3 w-100">Salvar Palpite</button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% endif %}
+</div>
+{% endblock %}
