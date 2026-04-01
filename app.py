@@ -43,6 +43,11 @@ with app.app_context():
         admin = User(username='admin', password=generate_password_hash('123'))
         db.session.add(admin)
         db.session.commit()
+        if not User.query.filter_by(username='edna').first():
+    novo = User(username='edna', password=generate_password_hash('amora01'))
+    db.session.add(novo)
+    db.session.commit()
+
     # Criar Jogo padrão
     if not Game.query.first():
         jogo = Game(team_a='Brasil', team_b='Argentina', round_no=1)
