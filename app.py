@@ -28,11 +28,12 @@ class Game(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     team_a = db.Column(db.String(50), nullable=False)
     team_b = db.Column(db.String(50), nullable=False)
-    score_a = db.Column(db.Integer, nullable=True) # Resultado Real
-    score_b = db.Column(db.Integer, nullable=True) # Resultado Real
-    date = db.Column(db.String(10), nullable=True) # YYYY-MM-DD
-    time = db.Column(db.String(5), nullable=True)  # HH:MM
+    score_a = db.Column(db.Integer, nullable=True) # Placar Real
+    score_b = db.Column(db.Integer, nullable=True) # Placar Real
+    date = db.Column(db.String(10), nullable=True)
+    time = db.Column(db.String(5), nullable=True)
     round_no = db.Column(db.Integer, default=1)
+    status = db.Column(db.String(20), default='aberto') # aberto / encerrado
     bets = db.relationship('Bet', backref='game', lazy=True)
 
 class Bet(db.Model):
@@ -41,20 +42,25 @@ class Bet(db.Model):
     game_id = db.Column(db.Integer, db.ForeignKey('game.id'), nullable=False)
     bet_score_a = db.Column(db.Integer, nullable=False)
     bet_score_b = db.Column(db.Integer, nullable=False)
+    points_earned = db.Column(db.Integer, default=0)
 
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# --- INICIALIZAÇÃO ---
-with app.app_context():
-    db.create_all()
-    usuarios = ['admin', 'edna', 'juliano', 'william', 'dorinha']
-    senha_hash = generate_password_hash('123')
-    for nome in usuarios:
-        if not User.query.filter_by(username=nome).first():
-            db.session.add(User(username=nome, password=senha_hash))
-    db.session.commit()
+# --- LÓGICA DE PONTUAÇÃO ---
+def calcular_pontos(bet, real_a, real_b):
+    bet_a, bet_b = bet.bet_score_a, bet.bet_score_b
+    # 1. Placar Exato (10 pts)
+    if bet_a == real_a and bet_b == real_b:
+        return 10
+    # 2. Acertou Vencedor + Saldo de Gols (7 pts)
+    if (real_a - real_b) == (bet_a - bet_b) and (real_a > real_b and bet_a > bet_b or real_a < real_b and bet_a < bet_b):
+        return 7
+    # 3. Acertou apenas Vencedor ou Empate (5 pts)
+    if (real_a > real_b and bet_a > bet_b) or (real_a < real_b and bet_a < bet_b) or (real_a == real_b and bet_a == bet_b):
+        return 5
+    return 0
 
 # --- ROTAS ---
 
@@ -62,42 +68,45 @@ with app.app_context():
 @login_required
 def index():
     games = Game.query.order_by(Game.date, Game.time).all()
-    # Pega as apostas do usuário atual para mostrar no campo
     user_bets = {bet.game_id: bet for bet in current_user.bets}
-    
-    # Lógica de tempo para travar palpite
-    now = datetime.now()
-    current_dt = now.strftime("%Y-%m-%d %H:%M")
-    
-    return render_template('index.html', games=games, user_bets=user_bets, current_dt=current_dt)
-
-@app.route('/palpite/<int:game_id>', methods=['POST'])
-@login_required
-def palpite(game_id):
-    game = Game.query.get_or_404(game_id)
-    
-    # TRAVA DE HORÁRIO: Verifica se o jogo já começou
-    game_dt = f"{game.date} {game.time}"
     now_dt = datetime.now().strftime("%Y-%m-%d %H:%M")
-    
-    if now_dt >= game_dt:
-        flash('Erro: O jogo já começou! Palpites encerrados.')
+    return render_template('index.html', games=games, user_bets=user_bets, current_dt=now_dt)
+
+@app.route('/ranking')
+@login_required
+def ranking():
+    users = User.query.order_by(User.points_total.desc()).all()
+    return render_template('ranking.html', users=users)
+
+@app.route('/admin', methods=['GET', 'POST'])
+@login_required
+def admin():
+    if current_user.username != 'admin':
         return redirect(url_for('index'))
-
-    score_a = request.form.get('score_a')
-    score_b = request.form.get('score_b')
-
-    # Verifica se já existe aposta, se sim atualiza, se não cria
-    bet = Bet.query.filter_by(user_id=current_user.id, game_id=game_id).first()
-    if bet:
-        bet.bet_score_a = score_a
-        bet.bet_score_b = score_b
-    else:
-        new_bet = Bet(user_id=current_user.id, game_id=game_id, bet_score_a=score_a, bet_score_b=score_b)
-        db.session.add(new_bet)
     
-    db.session.commit()
-    flash('Palpite salvo com sucesso!')
-    return redirect(url_for('index'))
+    if request.method == 'POST':
+        # Se for cadastro de novo jogo
+        if 'team_a' in request.form:
+            novo = Game(team_a=request.form['team_a'], team_b=request.form['team_b'], 
+                        date=request.form['date'], time=request.form['time'], round_no=request.form['round_no'])
+            db.session.add(novo)
+        
+        # Se for encerramento de jogo e cálculo de pontos
+        elif 'game_id' in request.form:
+            g = Game.query.get(request.form['game_id'])
+            g.score_a = int(request.form['res_a'])
+            g.score_b = int(request.form['res_b'])
+            g.status = 'encerrado'
+            
+            for b in g.bets:
+                pts = calcular_pontos(b, g.score_a, g.score_b)
+                b.points_earned = pts
+                b.user.points_total += pts
+        
+        db.session.commit()
+        return redirect(url_for('admin'))
 
-# Mantenha as rotas /admin, /login e /logout que enviamos antes...
+    games = Game.query.all()
+    return render_template('admin.html', games=games)
+
+# Mantenha as funções de Login/Logout e setup_database de antes...
