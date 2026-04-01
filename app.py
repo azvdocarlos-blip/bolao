@@ -48,6 +48,12 @@ def setup_database():
 
 # Chama a função de setup logo após definir o app
 setup_database()
+        # Cria um jogo de teste se o banco estiver vazio
+        if not Game.query.first():
+            jogo_teste = Game(team_a='Brasil', team_b='Argentina', round_no=1)
+            db.session.add(jogo_teste)
+            db.session.commit()
+            print(">>> Jogo de teste criado!")
 
 # --- ROTAS ---
 @app.route('/')
