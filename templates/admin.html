@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4">
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <h4 class="card-title">Cadastrar Novo Jogo</h4>
+                <form method="POST">
+                    <div class="mb-2">
+                        <label class="form-label">Time A</label>
+                        <input type="text" name="team_a" class="form-control" required>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Time B</label>
+                        <input type="text" name="team_b" class="form-control" required>
+                    </div>
+                    <div class="row">
+                        <div class="col">
+                            <label class="form-label">Data</label>
+                            <input type="date" name="date" class="form-control" required>
+                        </div>
+                        <div class="col">
+                            <label class="form-label">Horário</label>
+                            <input type="time" name="time" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="mb-3 mt-2">
+                        <label class="form-label">Rodada</label>
+                        <input type="number" name="round_no" class="form-control" value="1" required>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100">Salvar Jogo</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h4>Jogos Cadastrados</h4>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Data/Hora</th>
+                            <th>Confronto</th>
+                            <th>Rodada</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for game in games %}
+                        <tr>
+                            <td>{{ game.date }} às {{ game.time }}</td>
+                            <td>{{ game.team_a }} x {{ game.team_b }}</td>
+                            <td>{{ game.round_no }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
