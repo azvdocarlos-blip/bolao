@@ -7,7 +7,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'chave-secreta-bolao-2026'
 
-# Caminho absoluto para o banco de dados no Render
+# Configuração do banco de dados (SQLite)
 basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'bolao.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -35,35 +35,34 @@ class Game(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# --- INICIALIZAÇÃO (Roda sempre que o app liga) ---
+# --- INICIALIZAÇÃO (CADASTRO AUTOMÁTICO) ---
 with app.app_context():
     db.create_all()
-    # Criar Admin padrão
-    if not User.query.filter_by(username='admin').first():
-        admin = User(username='admin', password=generate_password_hash('123'))
-        db.session.add(admin)
-        db.session.commit()
-        
-     if not User.query.filter_by(username='edna').first():
-         novo = User(username='edna', password=generate_password_hash('amora01'))
-         db.session.add(novo)
-         db.session.commit()
-
-    # Criar Jogo padrão
+    
+    # Lista de usuários para cadastrar
+    usuarios_para_criar = ['admin', 'edna', 'juliano', 'william', 'dorinha']
+    senha_padrao = generate_password_hash('123')
+    
+    for nome in usuarios_para_criar:
+        if not User.query.filter_by(username=nome).first():
+            novo_usuario = User(username=nome, password=senha_padrao)
+            db.session.add(novo_usuario)
+            print(f">>> Usuário {nome} criado!")
+    
+    # Jogo padrão para o site não abrir vazio
     if not Game.query.first():
         jogo = Game(team_a='Brasil', team_b='Argentina', round_no=1)
         db.session.add(jogo)
-        db.session.commit()
+        
+    db.session.commit()
 
 # --- ROTAS ---
-
 @app.route('/')
 def index():
-    # Se não estiver logado, manda para o login em vez de dar erro
     if not current_user.is_authenticated:
         return redirect(url_for('login'))
-    all_games = Game.query.all()
-    return render_template('index.html', games=all_games)
+    games = Game.query.all()
+    return render_template('index.html', games=games)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
