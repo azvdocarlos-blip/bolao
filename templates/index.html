@@ -1,39 +1,31 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>Jogos Disponíveis</h2>
-    <span class="badge bg-primary">Usuário: {{ current_user.username }}</span>
-</div>
-
+<h2 class="mb-4">Próximos Jogos</h2>
 <div class="row">
-    {% if not games %}
-        <div class="col-12 text-center mt-5">
-            <div class="alert alert-info">
-                Nenhum jogo cadastrado para esta rodada ainda. 
-                <br>Aguarde o administrador inserir as partidas!
+    {% for game in games %}
+    <div class="col-md-6 mb-4">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white text-center border-0 pt-3">
+                <span class="badge bg-secondary">Rodada {{ game.round_no }}</span>
+                <p class="text-muted mb-0 mt-1" style="font-size: 0.8rem;">
+                    📅 {{ game.date }} | 🕒 {{ game.time }}
+                </p>
             </div>
-        </div>
-    {% else %}
-        {% for game in games %}
-        <div class="col-md-6 mb-3">
-            <div class="card shadow-sm">
-                <div class="card-body text-center">
-                    <h5 class="card-title">Rodada {{ game.round_no }}</h5>
-<p class="text-muted small">{{ game.date }} - {{ game.time }}</p>
-
-                    <div class="d-flex justify-content-around align-items-center">
-                        <span class="fw-bold">{{ game.team_a }}</span>
-                        <input type="number" class="form-control text-center" style="width: 60px;" placeholder="0">
-                        <span>X</span>
-                        <input type="number" class="form-control text-center" style="width: 60px;" placeholder="0">
-                        <span class="fw-bold">{{ game.team_b }}</span>
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center text-center">
+                    <div style="flex: 1;"><strong>{{ game.team_a }}</strong></div>
+                    <div class="d-flex align-items-center mx-2">
+                        <input type="number" class="form-control text-center mx-1" style="width: 50px;" placeholder="0">
+                        <span class="fw-bold">x</span>
+                        <input type="number" class="form-control text-center mx-1" style="width: 50px;" placeholder="0">
                     </div>
-                    <button class="btn btn-outline-success btn-sm mt-3 w-100">Salvar Palpite</button>
+                    <div style="flex: 1;"><strong>{{ game.team_b }}</strong></div>
                 </div>
+                <button class="btn btn-primary w-100 mt-3">Salvar Palpite</button>
             </div>
         </div>
-        {% endfor %}
-    {% endif %}
+    </div>
+    {% endfor %}
 </div>
 {% endblock %}
