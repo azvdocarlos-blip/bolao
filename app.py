@@ -71,21 +71,17 @@ def ranking():
     users = User.query.order_by(User.points_total.desc()).all()
     return render_template('ranking.html', users=users)
 
+# Mova a criação das tabelas para fora do bloco __main__ 
+# para o Render conseguir executar ao subir o gunicorn
+with app.app_context():
+    db.create_all()
+    # Criar admin automático
+    if not User.query.filter_by(username="admin").first():
+        from werkzeug.security import generate_password_hash
+        novo_admin = User(username="admin", password=generate_password_hash("123"))
+        db.session.add(novo_admin)
+        db.session.commit()
+        print("Banco inicializado e Admin criado!")
+
 if __name__ == '__main__':
-    with app.app_context():
-        # 1. Cria as tabelas do banco de dados
-        db.create_all()
-        
-        # 2. Cria o usuário administrador automaticamente se não existir
-        admin_user = "admin"
-        admin_pass = "123" # Você pode mudar aqui
-        
-        if not User.query.filter_by(username=admin_user).first():
-            senha_hash = generate_password_hash(admin_pass)
-            novo_admin = User(username=admin_user, password=senha_hash)
-            db.session.add(novo_admin)
-            db.session.commit()
-            print(">>> Usuário ADMIN criado com sucesso!")
-
     app.run(debug=True)
-
