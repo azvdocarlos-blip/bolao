@@ -22,16 +22,25 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(50), unique=True, nullable=False)
     password = db.Column(db.String(100), nullable=False)
     points_total = db.Column(db.Integer, default=0)
+    bets = db.relationship('Bet', backref='user', lazy=True)
 
 class Game(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     team_a = db.Column(db.String(50), nullable=False)
     team_b = db.Column(db.String(50), nullable=False)
-    score_a = db.Column(db.Integer, nullable=True)
-    score_b = db.Column(db.Integer, nullable=True)
-    date = db.Column(db.String(10), nullable=True) # Formato: YYYY-MM-DD
-    time = db.Column(db.String(5), nullable=True)  # Formato: HH:MM
+    score_a = db.Column(db.Integer, nullable=True) # Resultado Real
+    score_b = db.Column(db.Integer, nullable=True) # Resultado Real
+    date = db.Column(db.String(10), nullable=True) # YYYY-MM-DD
+    time = db.Column(db.String(5), nullable=True)  # HH:MM
     round_no = db.Column(db.Integer, default=1)
+    bets = db.relationship('Bet', backref='game', lazy=True)
+
+class Bet(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    game_id = db.Column(db.Integer, db.ForeignKey('game.id'), nullable=False)
+    bet_score_a = db.Column(db.Integer, nullable=False)
+    bet_score_b = db.Column(db.Integer, nullable=False)
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -53,48 +62,42 @@ with app.app_context():
 @login_required
 def index():
     games = Game.query.order_by(Game.date, Game.time).all()
-    return render_template('index.html', games=games)
+    # Pega as apostas do usuário atual para mostrar no campo
+    user_bets = {bet.game_id: bet for bet in current_user.bets}
+    
+    # Lógica de tempo para travar palpite
+    now = datetime.now()
+    current_dt = now.strftime("%Y-%m-%d %H:%M")
+    
+    return render_template('index.html', games=games, user_bets=user_bets, current_dt=current_dt)
 
-@app.route('/admin', methods=['GET', 'POST'])
+@app.route('/palpite/<int:game_id>', methods=['POST'])
 @login_required
-def admin():
-    # Segurança: Só o usuário 'admin' acessa esta página
-    if current_user.username != 'admin':
-        flash('Acesso negado!')
+def palpite(game_id):
+    game = Game.query.get_or_404(game_id)
+    
+    # TRAVA DE HORÁRIO: Verifica se o jogo já começou
+    game_dt = f"{game.date} {game.time}"
+    now_dt = datetime.now().strftime("%Y-%m-%d %H:%M")
+    
+    if now_dt >= game_dt:
+        flash('Erro: O jogo já começou! Palpites encerrados.')
         return redirect(url_for('index'))
 
-    if request.method == 'POST':
-        novo_jogo = Game(
-            team_a=request.form['team_a'],
-            team_b=request.form['team_b'],
-            date=request.form['date'],
-            time=request.form['time'],
-            round_no=request.form['round_no']
-        )
-        db.session.add(novo_jogo)
-        db.session.commit()
-        flash('Jogo cadastrado com sucesso!')
-        return redirect(url_for('admin'))
+    score_a = request.form.get('score_a')
+    score_b = request.form.get('score_b')
 
-    games = Game.query.all()
-    return render_template('admin.html', games=games)
+    # Verifica se já existe aposta, se sim atualiza, se não cria
+    bet = Bet.query.filter_by(user_id=current_user.id, game_id=game_id).first()
+    if bet:
+        bet.bet_score_a = score_a
+        bet.bet_score_b = score_b
+    else:
+        new_bet = Bet(user_id=current_user.id, game_id=game_id, bet_score_a=score_a, bet_score_b=score_b)
+        db.session.add(new_bet)
+    
+    db.session.commit()
+    flash('Palpite salvo com sucesso!')
+    return redirect(url_for('index'))
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        user = User.query.filter_by(username=request.form['username']).first()
-        if user and check_password_hash(user.password, request.form['password']):
-            login_user(user)
-            return redirect(url_for('index'))
-        flash('Usuário ou senha incorretos.')
-    return render_template('login.html')
-
-@app.route('/logout')
-@login_required
-def logout():
-    logout_user()
-    return redirect(url_for('login'))
-
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+# Mantenha as rotas /admin, /login e /logout que enviamos antes...
