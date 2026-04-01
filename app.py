@@ -1,16 +1,22 @@
+import os
 from flask import Flask, render_template, redirect, url_for, request, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'uma-chave-bem-segura'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///bolao.db'
+app.config['SECRET_KEY'] = 'chave-secreta-do-bolao-123'
+
+# Configuração robusta do caminho do banco de dados
+basedir = os.path.abspath(os.path.dirname(__file__))
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'bolao.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
-# --- MODELOS DO BANCO DE DATAS ---
+# --- MODELOS ---
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
@@ -21,33 +27,27 @@ class Game(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     team_a = db.Column(db.String(50))
     team_b = db.Column(db.String(50))
-    score_a = db.Column(db.Integer, nullable=True) # Resultado real
+    score_a = db.Column(db.Integer, nullable=True)
     score_b = db.Column(db.Integer, nullable=True)
     round_no = db.Column(db.Integer)
-
-class Bet(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    game_id = db.Column(db.Integer, db.ForeignKey('game.id'))
-    bet_a = db.Column(db.Integer)
-    bet_b = db.Column(db.Integer)
 
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# --- LÓGICA DE PONTUAÇÃO ---
-def calculate_points(bet_a, bet_b, real_a, real_b):
-    if bet_a == real_a and bet_b == real_b:
-        return 5  # Placar Exato
-    
-    # Lógica de Vencedor/Empate
-    res_bet = (bet_a > bet_b) - (bet_a < bet_b)
-    res_real = (real_a > real_b) - (real_a < real_b)
-    
-    if res_bet == res_real:
-        return 3
-    return 0
+# --- INICIALIZAÇÃO DO BANCO (FORÇADA) ---
+def setup_database():
+    with app.app_context():
+        db.create_all()
+        # Cria admin se não existir
+        if not User.query.filter_by(username='admin').first():
+            admin = User(username='admin', password=generate_password_hash('123'))
+            db.session.add(admin)
+            db.session.commit()
+            print(">>> Banco e Admin criados!")
+
+# Chama a função de setup logo após definir o app
+setup_database()
 
 # --- ROTAS ---
 @app.route('/')
@@ -66,22 +66,11 @@ def login():
         flash('Login inválido')
     return render_template('login.html')
 
-@app.route('/ranking')
-def ranking():
-    users = User.query.order_by(User.points_total.desc()).all()
-    return render_template('ranking.html', users=users)
-
-# Mova a criação das tabelas para fora do bloco __main__ 
-# para o Render conseguir executar ao subir o gunicorn
-with app.app_context():
-    db.create_all()
-    # Criar admin automático
-    if not User.query.filter_by(username="admin").first():
-        from werkzeug.security import generate_password_hash
-        novo_admin = User(username="admin", password=generate_password_hash("123"))
-        db.session.add(novo_admin)
-        db.session.commit()
-        print("Banco inicializado e Admin criado!")
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('login'))
 
 if __name__ == '__main__':
     app.run(debug=True)
