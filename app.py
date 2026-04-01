@@ -5,9 +5,9 @@ from flask_login import LoginManager, UserMixin, login_user, login_required, log
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'chave-secreta-do-bolao-123'
+app.config['SECRET_KEY'] = 'chave-secreta-bolao-2026'
 
-# Configuração robusta do caminho do banco de dados
+# Configuração de caminho absoluto para o SQLite no Render
 basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'bolao.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -16,7 +16,7 @@ db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
-# --- MODELOS ---
+# --- MODELOS DO BANCO DE DADOS ---
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
@@ -35,48 +35,15 @@ class Game(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# --- INICIALIZAÇÃO DO BANCO (FORÇADA) ---
-def setup_database():
-    with app.app_context():
-        db.create_all()
-        # Cria admin se não existir
-        if not User.query.filter_by(username='admin').first():
-            admin = User(username='admin', password=generate_password_hash('123'))
-            db.session.add(admin)
-            db.session.commit()
-            print(">>> Banco e Admin criados!")
-
-# Chama a função de setup logo após definir o app
-setup_database()
-        # Cria um jogo de teste se o banco estiver vazio
-        if not Game.query.first():
-            jogo_teste = Game(team_a='Brasil', team_b='Argentina', round_no=1)
-            db.session.add(jogo_teste)
-            db.session.commit()
-            print(">>> Jogo de teste criado!")
-
-# --- ROTAS ---
-@app.route('/')
-@login_required
-def index():
-    games = Game.query.all()
-    return render_template('index.html', games=games)
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        user = User.query.filter_by(username=request.form['username']).first()
-        if user and check_password_hash(user.password, request.form['password']):
-            login_user(user)
-            return redirect(url_for('index'))
-        flash('Login inválido')
-    return render_template('login.html')
-
-@app.route('/logout')
-@login_required
-def logout():
-    logout_user()
-    return redirect(url_for('login'))
-
-if __name__ == '__main__':
-    app.run(debug=True)
+# --- INICIALIZAÇÃO AUTOMÁTICA (USUÁRIO E JOGOS) ---
+with app.app_context():
+    db.create_all()
+    
+    # Criar Admin se não existir
+    if not User.query.filter_by(username='admin').first():
+        hashed_pw = generate_password_hash('123')
+        admin = User(username='admin', password=hashed_pw)
+        db.session.add(admin)
+        db.session.commit()
+    
+    # Criar Jogo de Test
