@@ -73,5 +73,19 @@ def ranking():
 
 if __name__ == '__main__':
     with app.app_context():
+        # 1. Cria as tabelas do banco de dados
         db.create_all()
+        
+        # 2. Cria o usuário administrador automaticamente se não existir
+        admin_user = "admin"
+        admin_pass = "123" # Você pode mudar aqui
+        
+        if not User.query.filter_by(username=admin_user).first():
+            senha_hash = generate_password_hash(admin_pass)
+            novo_admin = User(username=admin_user, password=senha_hash)
+            db.session.add(novo_admin)
+            db.session.commit()
+            print(">>> Usuário ADMIN criado com sucesso!")
+
     app.run(debug=True)
+
